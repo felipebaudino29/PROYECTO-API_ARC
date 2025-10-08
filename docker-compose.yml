@@ -1,0 +1,82 @@
+version: "3.9"
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=propcontrol
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongo:
+    image: mongo:6
+    container_name: mongo
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval \"db.runCommand({ ping: 1 }).ok\" | grep 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  solr:
+    image: solr:9
+    container_name: solr
+    ports:
+      - "8983:8983"
+    command: ["solr-precreate", "properties"]
+
+  memcached:
+    image: memcached:1.6
+    container_name: memcached
+    ports:
+      - "11211:11211"
+
+  users-api:
+    build: ./services/users-api
+    container_name: users-api
+    env_file:
+      - ./.env/users-api.env
+    ports:
+      - "8081:8080"
+    depends_on:
+      - mysql
+
+  properties-api:
+    build: ./services/properties-api
+    container_name: properties-api
+    env_file:
+      - ./.env/properties-api.env
+    ports:
+      - "8082:8080"
+    depends_on:
+      - mongo
+      - rabbitmq
+      - users-api
+
+  search-api:
+    build: ./services/search-api
+    container_name: search-api
+    env_file:
+      - ./.env/search-api.env
+    ports:
+      - "8083:8080"
+    depends_on:
+      - solr
+      - memcached
+      - rabbitmq
+      - properties-api
